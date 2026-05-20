@@ -117,7 +117,7 @@ npx rcedit "Claude Code.exe" --set-icon claude-code.ico
 
 > 图标通过 `scripts/gen-icon.ts` 生成，SVG 来源 `@lobehub/icons`，深色 R 角背景 + Claude 官方橙色 Logo (`#D97757`)。产物 `claude-code.ico` 包含 16~256px 六个尺寸。
 
-如果遇到 bug 请直接提一个 issues, 我们优先解决
+如果遇到 bug 请直接提一个 issues
 
 ### 👤 新人配置 /login
 
