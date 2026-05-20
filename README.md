@@ -1,25 +1,6 @@
 # Claude Code SRC
 
-## ⚡ 快速开始(安装版)
-
-不用克隆仓库, 从 NPM 下载后, 直接使用
-
-```sh
-npm i -g claude-code-best
-
-# bun 安装比较多问题, 推荐 npm 装
-# bun  i -g claude-code-best
-# bun pm -g trust claude-code-best @claude-code-best/mcp-chrome-bridge
-
-ccb # 以 nodejs 打开 claude code
-ccb-bun # 以 bun 形态打开
-ccb update # 更新到最新版本
-CLAUDE_BRIDGE_BASE_URL=https://remote-control.claude-code-best.win/ CLAUDE_BRIDGE_OAUTH_TOKEN=test-my-key ccb --remote-control # 我们有自部署的远程控制
-```
-
-> **安装/更新失败？** 先 `npm rm -g claude-code-best` 清理旧版本，再 `npm i -g claude-code-best@latest`。仍失败则指定版本号：`npm i -g claude-code-best@<版本号>`
-
-## ⚡ 快速开始(源码版)
+## ⚡ 快速开始
 
 ### ⚙️ 环境要求
 
