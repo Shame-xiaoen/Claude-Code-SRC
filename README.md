@@ -169,7 +169,7 @@ TUI (REPL) 模式需要真实终端，无法直接通过 VS Code launch 启动�
 
 ## Teach Me 学习项目
 
-我们新加了一个 teach-me skills, 通过问答式引导帮你理解这个项目的任何模块。(调整 [sigma skill 而来](https://github.com/sanyuan0704/sanyuan-skills))
+项目中添加了一个 teach-me skills, 通过问答式引导帮你理解这个项目的任何模块。(调整 [sigma skill 而来](https://github.com/sanyuan0704/sanyuan-skills))
 
 ```bash
 # 在 REPL 中直接输入
