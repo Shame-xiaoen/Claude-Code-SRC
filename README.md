@@ -123,8 +123,7 @@
   | `bridgeStatusUtil.ts` / `bridgeUI.ts` / `bridgeDebug.ts` | 状态/UI/调试辅助 |
   | `createSession.ts` / `sessionRunner.ts` / `sessionIdCompat.ts` | 远程会话管理 |
   | `replBridge.ts` / `replBridgeHandle.ts` / `replBridgeTransport.ts` / `initReplBridge.ts` | REPL 与 Bridge 的胶水层 |
-  | `jwtUtils.ts` / `trustedDevice.ts` / `workSecret.ts` / `webhookSanitizer.ts` | JWT 认证 / 设备信任 / 工作密钥 /
-  Webhook 清洗 |
+  | `jwtUtils.ts` / `trustedDevice.ts` / `workSecret.ts` / `webhookSanitizer.ts` | JWT 认证 / 设备信任 / 工作密钥 / Webhook 清洗 |
   | `peerSessions.ts` | 多设备会话同步 |
   | `inboundMessages.ts` / `inboundAttachments.ts` | 入站消息与附件处理 |
   | `remoteBridgeCore.ts` / `remoteInterruptHandling.ts` | 远程核心调度 / 中断处理 |
