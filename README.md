@@ -55,8 +55,19 @@
 
   | 子目录 | 作用 |
   |--------|------|
-  | `api/` | **核心 API 客户端**。`claude.ts` 调用 Anthropic SDK 流式接口；含 7 个
-  provider（`firstParty`/`bedrock`/`vertex`/`foundry`/`openai`/`gemini`/`grok`）的兼容层适配 |
+    | `api/` | **核心 API 客户端**。`claude.ts` 调用 Anthropic SDK 流式接口，处理 `BetaRawMessageStreamEvent`
+  事件流，构建请求参数（system prompt、messages、tools、betas） |
+  | `api/` 内置 provider | `firstParty`（默认，Anthropic 直连）、`bedrockClient.ts`（AWS Bedrock，IAM 签名 + ARN model
+  id）、`client.ts` 中的 vertex/foundry 分支（Google Vertex / Azure Foundry，适配 GCP/Azure 认证） |
+  | `api/openai/` | **OpenAI 协议兼容层**：`requestBody.ts` 把 Anthropic Messages 转 Chat
+  Completions，`responsesAdapter.ts` 把 OpenAI SSE 流转回 Anthropic 流事件。支持 Ollama / DeepSeek / vLLM / 任意 OpenAI
+  兼容端点（含 DeepSeek thinking mode）。环境变量 `CLAUDE_CODE_USE_OPENAI=1` + `OPENAI_API_KEY` / `OPENAI_BASE_URL` /
+  `OPENAI_MODEL` |
+  | `api/gemini/` | **Google Gemini 兼容层**：Anthropic Messages ↔ Google `generateContent` 流式 API 互转，适配
+  tools/system/role 差异。环境变量 `CLAUDE_CODE_USE_GEMINI=1` + `GEMINI_API_KEY`，模型映射优先级 `GEMINI_MODEL` >
+  `GEMINI_DEFAULT_SONNET_MODEL`/`OPUS_MODEL` > 原样 |
+  | `api/grok/` | **xAI Grok 兼容层**：自定义模型映射。环境变量 `CLAUDE_CODE_USE_GROK=1` |
+  | `provider兼容层适配` |
   | `acp/` | ACP (Agent Client Protocol) agent 实现：`agent.ts`、`bridge.ts`、`permissions.ts`、`entry.ts` |
   | `auth/` | Anthropic OAuth 登录、API key 管理 |
   | `oauth/` | 通用 OAuth flow（用于 MCP server、外部集成） |
@@ -183,8 +194,7 @@
   | 连接器 | `CONNECTOR_TEXT`、`COMMIT_ATTRIBUTION`、`DIRECT_CONNECT` |
   | 实验性 | `EXPERIMENTAL_SKILL_SEARCH`、`EXPERIMENTAL_SEARCH_EXTRA_TOOLS` |
   | 模式 | `POOR`、`SSH_REMOTE` |
-  | 已禁用 |
-  `CONTEXT_COLLAPSE`、`FORK_SUBAGENT`、`UDS_INBOX`、`LAN_PIPES`、`REVIEW_ARTIFACT`、`TEAMMEM`、`SKILL_LEARNING` |
+  | 已禁用 | `CONTEXT_COLLAPSE`、`FORK_SUBAGENT`、`UDS_INBOX`、`LAN_PIPES`、`REVIEW_ARTIFACT`、`TEAMMEM`、`SKILL_LEARNING` |
 
   **类型声明**：`src/types/internal-modules.d.ts` 中声明 `bun:bundle` 模块的 `feature` 函数签名。
 
