@@ -1,5 +1,288 @@
 # Claude Code SRC
 
+  ## 🏗 架构摘要
+
+  ### 1. 工具系统
+
+  > **路径说明**：工具接口与注册表在 `src/`，工具实现在 `packages/builtin-tools/`。
+
+  | 文件/目录 | 作用 |
+  |----------|------|
+  | `src/Tool.ts` | `Tool` 接口定义 + `findToolByName` / `toolMatchesName` 辅助函数 |
+  | `src/tools.ts` | 工具注册表，从 `@claude-code-best/builtin-tools` 拼装最终 tool list，按 feature flag / `USER_TYPE`
+  条件加载 |
+  | `src/constants/tools.ts` | `CORE_TOOLS` 白名单常量（38 个核心工具名），用于 `isDeferredTool` 白名单判定 |
+  | `packages/builtin-tools/src/tools/` | **63 个工具实现目录**，导出 `@claude-code-best/builtin-tools` 包 |
+  | `src/services/searchExtraTools/` | TF-IDF 工具索引（`toolIndex.ts`），延迟工具按需加载与语义搜索 |
+
+  **主要工具分类**：
+
+  - **文件操作**：`FileEditTool`、`FileReadTool`、`FileWriteTool`、`GlobTool`、`GrepTool`、`NotebookEditTool`
+  - **Shell / 执行**：`BashTool`、`PowerShellTool`、`ExecuteTool`、`REPLTool`
+  - **Agent 系统**：`AgentTool`、`TaskCreateTool`、`TaskUpdateTool`、`TaskListTool`、`TaskGetTool`
+  - **规划**：`EnterPlanModeTool`、`ExitPlanModeTool`、`VerifyPlanExecutionTool`
+  - **Web /
+  MCP**：`WebFetchTool`、`WebSearchTool`、`MCPTool`、`McpAuthTool`、`ListMcpResourcesTool`、`ReadMcpResourceTool`
+  - **调度**：`CronCreateTool`、`CronDeleteTool`、`CronListTool`、`MonitorTool`
+  - **工具发现**：`SearchExtraToolsTool`、`ExecuteExtraTool`、`DiscoverSkillsTool`、`SyntheticOutput`
+  - **其他**：`LSPTool`、`ConfigTool`、`SkillTool`、`EnterWorktreeTool`、`ExitWorktreeTool`、`AskUserQuestionTool`、`Pus
+  hNotificationTool`
+
+  ---
+
+  ### 2. 指挥系统 (`src/commands/`)
+
+  用户在 REPL 中用 `/` 前缀调用的 slash command（例如 `/login`、`/poor`、`/teach-me`）。
+
+  - **120+ 个子目录**：每个 slash command 一个目录，目录内含命令实现（`.ts`/`.tsx`）。
+  - **顶层 `.ts`/`.tsx`**：跨命令复用的实现，如 `commit.ts`、`commit-push-pr.ts`、`review.ts`、`security-review.ts`、`in
+  it.ts`、`monitor.ts`、`statusline.tsx`、`ultraplan.tsx`、`autonomy.ts`。
+  - **`_shared/`**：命令间共享工具函数。
+  - **`createMovedToPluginCommand.ts`**：将旧命令重定向到插件实现的兼容层。
+
+  **常用命令**：`/login`、`/logout`、`/help`、`/clear`、`/config`、`/model`、`/poor`、`/fast`、`/cost`、`/compact`、`/hi
+  story`、`/resume`、`/teach-me`、`/agents`、`/mcp`、`/plugin`、`/skill-search`、`/skill-store`、`/permissions`、`/hooks
+  `、`/output-style`、`/theme`、`/keybindings`、`/doctor`、`/upgrade`、`/feedback`、`/review`、`/security-review`、`/sha
+  re`、`/recap`、`/stats`、`/vim`、`/voice`、`/ide`、`/chrome` 等。
+
+  > 命令通过 `src/main.tsx` 注册到 Commander.js，REPL 中由输入解析器拦截 `/` 前缀分发到对应处理器。
+
+  ---
+
+  ### 3. 服务层 (`src/services/`)
+
+  跨模块复用的后台服务，**不直接暴露给用户**，由 REPL、tools、commands 调用。
+
+  | 子目录 | 作用 |
+  |--------|------|
+  | `api/` | **核心 API 客户端**。`claude.ts` 调用 Anthropic SDK 流式接口；含 7 个
+  provider（`firstParty`/`bedrock`/`vertex`/`foundry`/`openai`/`gemini`/`grok`）的兼容层适配 |
+  | `acp/` | ACP (Agent Client Protocol) agent 实现：`agent.ts`、`bridge.ts`、`permissions.ts`、`entry.ts` |
+  | `auth/` | Anthropic OAuth 登录、API key 管理 |
+  | `oauth/` | 通用 OAuth flow（用于 MCP server、外部集成） |
+  | `mcp/` | MCP server 客户端连接、资源/工具发现 |
+  | `plugins/` | 插件加载与生命周期管理 |
+  | `lsp/` | LSP 服务器管理（Language Server Protocol） |
+  | `searchExtraTools/` | TF-IDF 工具索引，支持延迟工具语义搜索 |
+  | `skillSearch/` | Skill 语义搜索与预取 |
+  | `skillLearning/` | 学习记录持久化 |
+  | `compact/` / `contextCollapse/` | 对话压缩 |
+  | `extractMemories/` | 自动抽取并存储用户记忆 |
+  | `SessionMemory/` | 会话级记忆 |
+  | `MagicDocs/` | 自动更新 CLAUDE.md / 项目文档 |
+  | `sessionTranscript/` | 会话转录持久化 |
+  | `analytics/` | 统计上报（已 stub） |
+  | `langfuse/` | Langfuse 集成 |
+  | `policyLimits/` / `providerRegistry/` / `providerUsage/` | 配额、限流、provider 选路 |
+  | `AgentSummary/` / `PromptSuggestion/` / `toolUseSummary/` | LLM 辅助子任务（依赖 API） |
+  | `autoDream/` / `awaySummary.ts` | 会话间总结 / 自动构思 |
+  | `localVault/` | 本地凭据保险箱 |
+  | `remoteManagedSettings/` / `settingsSync/` / `teamMemorySync/` | 设置/记忆远程同步 |
+  | `tools/` | 服务层调用工具的辅助层 |
+  | `voice.ts` / `voiceStreamSTT.ts` / `doubaoSTT.ts` | 语音输入实现 |
+
+  ---
+
+  ### 4. 桥接系统 (`src/bridge/`)
+
+  Remote Control / Bridge 模式实现（feature-gated by `BRIDGE_MODE`），让 Claude Code 能被远程客户端（Web UI / 手机 App /
+   acp-link 等）控制。
+
+  | 文件 | 作用 |
+  |------|------|
+  | `bridgeMain.ts` | Bridge 模式入口（CLI 子命令 `remote-control` / `rc` / `bridge` 触发） |
+  | `bridgeApi.ts` | Bridge 与 Remote Control Server 之间的 REST/WS API |
+  | `bridgeMessaging.ts` | 消息传输层（双向 streaming） |
+  | `bridgePermissionCallbacks.ts` | 远程权限回调（远端审批本地工具调用） |
+  | `bridgeConfig.ts` / `envLessBridgeConfig.ts` / `pollConfig.ts` | Bridge 配置与轮询 |
+  | `bridgeEnabled.ts` | Feature flag 检查 |
+  | `bridgeStatusUtil.ts` / `bridgeUI.ts` / `bridgeDebug.ts` | 状态/UI/调试辅助 |
+  | `createSession.ts` / `sessionRunner.ts` / `sessionIdCompat.ts` | 远程会话管理 |
+  | `replBridge.ts` / `replBridgeHandle.ts` / `replBridgeTransport.ts` / `initReplBridge.ts` | REPL 与 Bridge 的胶水层 |
+  | `jwtUtils.ts` / `trustedDevice.ts` / `workSecret.ts` / `webhookSanitizer.ts` | JWT 认证 / 设备信任 / 工作密钥 /
+  Webhook 清洗 |
+  | `peerSessions.ts` | 多设备会话同步 |
+  | `inboundMessages.ts` / `inboundAttachments.ts` | 入站消息与附件处理 |
+  | `remoteBridgeCore.ts` / `remoteInterruptHandling.ts` | 远程核心调度 / 中断处理 |
+  | `codeSessionApi.ts` | 代码会话 REST 接口 |
+  | `capacityWake.ts` / `flushGate.ts` / `bridgeResultScheduling.ts` | 唤醒 / 输出冲刷 / 结果调度 |
+  | `rcDebugLog.ts` | Remote control 调试日志 |
+  | `types.ts` | Bridge 类型定义 |
+
+  **配套基础设施**：`packages/remote-control-server/`（自托管 RCS + Web UI）、`packages/acp-link/`（ACP 代理）。详见
+  `docs/features/remote-control-self-hosting.md`。
+
+  ---
+
+  ### 5. 权限系统 (`src/hooks/toolPermission/`)
+
+  工具执行前的权限审批中枢，连接 REPL UI / Bridge 远程审批 / 协调器多 worker 三种场景。
+
+  | 文件/目录 | 作用 |
+  |----------|------|
+  | `PermissionContext.ts` | 权限上下文定义（`permissionMode`、当前会话信任级别、bypass 状态等） |
+  | `permissionLogging.ts` | 权限决策日志（审计用） |
+  | `handlers/coordinatorHandler.ts` | **协调器模式**（feature `COORDINATOR_MODE`）下转发权限请求给主控 worker |
+  | `handlers/interactiveHandler.ts` | **交互模式**下弹出 Ink UI 对话框由用户审批 |
+  | `handlers/swarmWorkerHandler.ts` | **Swarm 多 worker** 模式下子 worker 把权限请求转发给主 worker |
+
+  **调用链**（顶层入口在 `src/hooks/useCanUseTool.tsx`）：
+
+  ```
+  Tool 调用 → useCanUseTool → toolPermission/handlers/* → 用户审批/Bridge远端审批/Coordinator转发
+                                                         └→ permissionLogging
+  ```
+
+  **权限模式**（`src/types/permissions.ts`）：`default` / `acceptEdits` / `bypassPermissions` / `plan` / `auto` /
+  `dontAsk`。
+
+  **相关组件**：`src/components/permissions/` 提供 UI 对话框；`src/services/acp/permissions.ts` 处理 ACP
+  协议下的权限传递；`bridgePermissionCallbacks.ts` 把权限请求路由到远端客户端。
+
+  ---
+
+  ### 6. 功能标记
+
+  > 详见 `CLAUDE.md` 的 "Feature Flag System" 段。
+
+  **使用方式**：
+
+  ```ts
+  import { feature } from 'bun:bundle';
+
+  if (feature('BUDDY')) {
+    // ...
+  }
+  ```
+
+  > ⚠️ **Bun 编译器限制**：`feature()` 只能直接出现在 `if`
+  条件或三元表达式位置，不能赋值给变量、不能放在箭头函数体里、不能作为 `&&` 链的一部分。
+
+  **启用方式**：环境变量 `FEATURE_<FLAG_NAME>=1`。
+
+  ```bash
+  FEATURE_BUDDY=1 FEATURE_FORK_SUBAGENT=1 bun run dev
+  ```
+
+  **默认行为**：
+  - **Dev mode**（`scripts/dev.ts`）：全部 flag 启用。
+  - **Build mode**（`build.ts`）：65+ 个 flag 默认启用，列表见 `DEFAULT_BUILD_FEATURES`。
+  - **不传环境变量时**：`feature()` 返回 `false`。
+
+  **常见 Feature Flag 分类**：
+
+  | 类别 | Flag |
+  |------|------|
+  | 基础 | `BUDDY`、`TRANSCRIPT_CLASSIFIER`、`BRIDGE_MODE`、`AGENT_TRIGGERS_REMOTE`、`CHICAGO_MCP`、`VOICE_MODE` |
+  | 统计/缓存 | `SHOT_STATS`、`PROMPT_CACHE_BREAK_DETECTION`、`TOKEN_BUDGET` |
+  | P0 本地 | `AGENT_TRIGGERS`、`ULTRATHINK`、`BUILTIN_EXPLORE_PLAN_AGENTS`、`LODESTONE` |
+  | P1 API 依赖 | `EXTRACT_MEMORIES`、`VERIFICATION_AGENT`、`KAIROS_BRIEF`、`AWAY_SUMMARY`、`ULTRAPLAN` |
+  | P2 | `DAEMON`、`ACP` |
+  | 工作流 | `WORKFLOW_SCRIPTS`、`HISTORY_SNIP`、`MONITOR_TOOL`、`KAIROS` |
+  | 多 worker | `COORDINATOR_MODE`、`BG_SESSIONS`、`TEMPLATES` |
+  | 连接器 | `CONNECTOR_TEXT`、`COMMIT_ATTRIBUTION`、`DIRECT_CONNECT` |
+  | 实验性 | `EXPERIMENTAL_SKILL_SEARCH`、`EXPERIMENTAL_SEARCH_EXTRA_TOOLS` |
+  | 模式 | `POOR`、`SSH_REMOTE` |
+  | 已禁用 |
+  `CONTEXT_COLLAPSE`、`FORK_SUBAGENT`、`UDS_INBOX`、`LAN_PIPES`、`REVIEW_ARTIFACT`、`TEAMMEM`、`SKILL_LEARNING` |
+
+  **类型声明**：`src/types/internal-modules.d.ts` 中声明 `bun:bundle` 模块的 `feature` 函数签名。
+
+  **实现位置**：
+  - 注入：`scripts/defines.ts`（dev 模式 `-d` flag）+ `build.ts`（`Bun.build({ define })`）
+  - 解析：Bun 内置 `bun:bundle` 模块在编译时静态替换为常量
+
+## 📂 目录结构
+
+  ```text
+  claude-code/
+  ├── src/                              # 主源码目录
+  │   ├── entrypoints/                 # CLI 入口（cli.tsx 真入口、init、mcp）
+  │   ├── main.tsx                     # Commander.js CLI 主定义（~5674 行）
+  │   ├── query.ts / QueryEngine.ts    # 核心 API 查询与对话编排
+  │   ├── Tool.ts / tools.ts           # Tool 接口定义与注册表
+  │   ├── context.ts                   # 系统/用户上下文构建
+  │   ├── bootstrap/                   # 启动初始化（session、CWD、project root 单例）
+  │   ├── state/                       # 全局状态（AppState、Zustand store、selectors）
+  │   ├── screens/                     # 顶层屏幕（REPL.tsx 主交互界面）
+  │   ├── components/                  # Ink UI 组件（149+ 个，消息渲染、权限对话、design-system）
+  │   ├── services/                    # 服务层（API 客户端、ACP、工具/技能搜索）
+  │   ├── commands/                    # CLI 子命令实现（mcp、auth、plugin、agents、poor 等）
+  │   ├── tools/                       # 工具系统辅助函数
+  │   ├── tasks/ / Task.ts             # 任务/计划系统
+  │   ├── skills/                      # 内置 skill
+  │   ├── bridge/                      # Remote Control / Bridge 模式
+  │   ├── daemon/                      # 长驻 daemon supervisor
+  │   ├── server/                      # 内置 HTTP 服务
+  │   ├── ssh/                         # SSH 远程模式
+  │   ├── plugins/                     # 插件系统
+  │   ├── voice/                       # 语音输入（Push-to-Talk）
+  │   ├── vim/                         # Vim 模式
+  │   ├── hooks/                       # 用户 hook 系统
+  │   ├── jobs/                        # 后台任务/模板 job
+  │   ├── coordinator/                 # 多 worker 协调器
+  │   ├── self-hosted-runner/          # 自托管运行器
+  │   ├── environment-runner/          # BYOC 环境运行器
+  │   ├── cli/                         # CLI 工具函数（bg、print、exit 等）
+  │   ├── outputStyles/                # 输出样式
+  │   ├── proactive/                   # 主动建议系统
+  │   ├── memdir/ / migrations/        # 持久化记忆 / 配置迁移
+  │   ├── schemas/ / constants/        # JSON Schema / 常量（CORE_TOOLS 等）
+  │   ├── utils/                       # 通用工具函数
+  │   ├── types/                       # TypeScript 类型声明
+  │   └── __tests__/                   # 单元测试（就近放置）
+  │
+  ├── packages/                         # Bun workspace 包
+  │   ├── @ant/                        # Anthropic 内部 fork 集合
+  │   │   ├── ink/                     # Forked Ink 框架（components/hooks/theme）
+  │   │   ├── computer-use-mcp/        # Computer Use MCP server
+  │   │   ├── computer-use-input/      # 键鼠模拟（darwin/win32/linux）
+  │   │   ├── computer-use-swift/      # 截图 + 应用管理
+  │   │   ├── claude-for-chrome-mcp/   # Chrome 浏览器控制
+  │   │   └── model-provider/          # Model provider 抽象层
+  │   ├── builtin-tools/               # 60+ 内置工具实现
+  │   ├── agent-tools/                 # Agent 工具集
+  │   ├── mcp-client/                  # MCP 客户端库
+  │   ├── acp-link/                    # ACP 代理服务器（WS → ACP agent 桥接）
+  │   ├── remote-control-server/       # 自托管 RCS + Web UI（React 19 + Vite）
+  │   ├── audio-capture-napi/          # 原生音频捕获
+  │   ├── image-processor-napi/        # 图像处理
+  │   ├── color-diff-napi/             # 颜色差异计算
+  │   ├── modifiers-napi/              # 键盘修饰键检测（macOS FFI）
+  │   ├── url-handler-napi/            # URL scheme 处理
+  │   └── weixin/                      # 微信集成
+  │
+  ├── tests/                            # 测试根目录
+  │   ├── integration/                 # 集成测试（CLI、context、pipeline、tool-chain 等）
+  │   └── mocks/                       # 共享 mock 与 fixture
+  │
+  ├── scripts/                          # 构建脚本（dev.ts、defines.ts、post-build.ts、gen-icon.ts）
+  ├── docs/                             # 文档（features/internals/diagrams/test-plans 等 16 个子目录）
+  ├── spec/                             # 功能设计规范（feature_<日期>_<编号>_<名称>）
+  ├── vendor/                           # 第三方二进制资源（audio-capture 等）
+  ├── teach-me/                         # /teach-me skill 学习记录
+  │
+  ├── .github/                          # GitHub Actions 工作流（ci、release-rcs、update-contributors）
+  ├── .husky/                           # Pre-commit hook
+  ├── .vscode/                          # VS Code 配置（含 attach 调试）
+  ├── .claude/                          # 项目级 Claude Code 工作区
+  │
+  ├── build.ts                          # Bun 构建脚本（splitting + post-process）
+  ├── vite.config.ts                    # Vite 备选构建管线
+  ├── biome.json                        # Biome lint/format 配置
+  ├── tsconfig.json / tsconfig.base.json # TypeScript 配置
+  ├── package.json / bun.lock           # 项目依赖与锁文件
+  ├── CLAUDE.md                         # 项目级 AI agent 指令
+  ├── AGENTS.md                         # Agent 配置说明
+  ├── DEV-LOG.md                        # 开发日志
+  └── README.md                         # 本文件
+  ```
+
+  > 顶层关键文件含义见 [`CLAUDE.md`](CLAUDE.md)，里面对 entrypoint、Tool 系统、Feature Flag、Multi-API 兼容层、Stubbed
+  模块等都有更详细的说明。
+
+
+
 ## ⚡ 快速开始
 
 ### ⚙️ 环境要求
