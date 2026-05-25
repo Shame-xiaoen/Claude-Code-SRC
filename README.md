@@ -9,8 +9,7 @@
   | 文件/目录 | 作用 |
   |----------|------|
   | `src/Tool.ts` | `Tool` 接口定义 + `findToolByName` / `toolMatchesName` 辅助函数 |
-  | `src/tools.ts` | 工具注册表，从 `@claude-code-best/builtin-tools` 拼装最终 tool list，按 feature flag / `USER_TYPE`
-  条件加载 |
+  | `src/tools.ts` | 工具注册表，从 `@claude-code-best/builtin-tools` 拼装最终 tool list，按 feature flag / `USER_TYPE` 条件加载 |
   | `src/constants/tools.ts` | `CORE_TOOLS` 白名单常量（38 个核心工具名），用于 `isDeferredTool` 白名单判定 |
   | `packages/builtin-tools/src/tools/` | **63 个工具实现目录**，导出 `@claude-code-best/builtin-tools` 包 |
   | `src/services/searchExtraTools/` | TF-IDF 工具索引（`toolIndex.ts`），延迟工具按需加载与语义搜索 |
